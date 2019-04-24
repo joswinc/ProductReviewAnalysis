@@ -1,0 +1,13 @@
+load_data = LOAD '/root/project/bigdata.csv' USING PigStorage(',');
+extract_details = FOREACH load_data GENERATE $0 as id,$1 as text;
+tokens = foreach extract_details generate id ,text , FLATTEN(TOKENIZE(text)) As word; 
+dictionary = load '/root/project/AFINN.txt' using PigStorage('\t') AS(word:chararray,rating:int);
+word_rate = JOIN tokens BY word, dictionary BY word USING 'replicated';
+describe word_rate;
+rating = foreach word_rate generate tokens::id as id,tokens::text as text, dictionary::rating as rate;
+word_group = group rating by (id,text);
+avg_rate = foreach word_group generate group, AVG(rating.rate) as data_rating;
+positive_data = filter avg_rate by data_rating>=0.0;
+negative_data = filter avg_rate by data_rating<0.0;
+STORE  positive_data into '/root/project/posresult1';
+STORE negative_data into '/root/project/negresult1';
